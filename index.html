@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="浓度与存活率数据的 4PL 拟合，支持 SVG、PNG、JPG、TIFF 和 PDF 图形导出。">
+  <meta name="theme-color" content="#ffffff"><meta name="robots" content="noindex,nofollow">
+  <title>IC50 曲线拟合</title>
+  <link rel="stylesheet" href="styles.css?v=20261029-i18n"><script defer src="i18n.js?v=20261029"></script><script defer src="i18n-messages.js?v=20261029"></script><script defer src="engine.js"></script><script defer src="reference.js"></script><script defer src="reference-ui.js"></script><script defer src="plot.js"></script><script defer src="export.js"></script><script defer src="app.js?v=20261029-i18n"></script>
+</head>
+<body>
+  <header class="header"><div class="brand"><h1>IC50 曲线拟合</h1><span>4PL</span></div><nav aria-label="导航"><a class="active" href="#workspace">分析</a><a id="help-link" href="#guide">使用说明</a></nav><span class="local-note">数据在浏览器内计算</span><label class="language-control"><span>语言</span><select id="language" aria-label="选择界面语言"><option data-no-i18n value="zh-CN">简体中文</option><option data-no-i18n value="en">English</option><option data-no-i18n value="ja">日本語</option><option data-no-i18n value="ko">한국어</option></select></label></header>
+  <main>
+    <div class="workspace" id="workspace">
+      <aside class="controls">
+        <section class="panel input-panel"><div class="section-head"><div><h2>数据</h2></div><button class="text-btn" id="example" type="button">测试示例</button></div><p class="subtle">粘贴浓度和存活率，每行一个浓度。</p>
+          <div class="data-labels"><label for="data">浓度、存活率（%）</label><button class="text-btn muted" id="clear" type="button">清空</button></div>
+          <textarea id="data" spellcheck="false" aria-describedby="input-help" placeholder="浓度,存活率1,存活率2…&#10;可直接粘贴 Excel 数据"></textarea>
+          <div class="input-foot"><span id="data-count">等待输入</span><label>浓度单位 <select id="unit" aria-label="浓度单位"><option>µg/mL</option><option>µM</option><option>nM</option><option>mg/mL</option><option>mM</option><option>ng/mL</option></select></label></div>
+          <details class="input-format"><summary>输入格式说明</summary><p class="micro" id="input-help">第一列为原始浓度，后续列为存活率或各复孔。支持逗号、Tab、空格分隔和表头。存活率填百分数（如 80，非 0.8）；单位设置仅修改标签，不换算浓度。每个复孔等权拟合。</p></details>
+          <div id="input-messages" class="input-messages" aria-live="polite"></div>
+          <div id="sample-tag" class="sample-tag" hidden>测试示例，非实验数据</div>
+        </section>
+        <section class="panel settings-panel"><div class="section-head"><div><h2>拟合模型</h2></div><span class="tiny-tag">下降型</span></div>
+          <fieldset class="models"><legend class="sr-only">拟合模型</legend>
+            <label class="model-card"><input type="radio" name="model" value="free" checked><span><strong>4PL，可变斜率</strong><small>拟合 Top、Bottom、HillSlope、IC50</small></span><i></i></label>
+            <label class="model-card"><input type="radio" name="model" value="fixed"><span><strong>固定 HillSlope = −1（3 参数）</strong><small>有标准斜率依据，或中间浓度较少时比较</small></span><i></i></label>
+            <label class="model-card"><input type="radio" name="model" value="normalized"><span><strong>固定 Top = 100、Bottom = 0（2 参数）</strong><small>仅在真实对照准确界定两端平台时使用</small></span><i></i></label>
+          </fieldset>
+          <div class="model-note" id="model-note">存活率写成 %，并不意味着应固定 Top=100、Bottom=0。</div>
+          <button class="fit-btn" id="fit" type="button"><span>拟合</span></button><p class="micro method-label">非线性最小二乘，不加权</p>
+        </section>
+      </aside>
+      <div class="results">
+        <section class="panel chart-panel"><div class="chart-head"><div><h2>曲线 <span id="curve-badge">等待拟合</span></h2></div><div class="axis-control" role="group" aria-label="横轴刻度"><button id="linear" type="button" aria-pressed="false">线性</button><button class="selected" id="log" type="button" aria-pressed="true">log10</button></div></div>
+          <div class="axis-info"><span id="axis-note">log10 轴按浓度的倍数间隔排布，刻度仍标原始浓度；改变刻度不会改变拟合。</span></div>
+          <div class="figure-controls"><label>图形样式<select id="plot-style"><option value="prism" selected>Prism 样式</option><option value="reference">自定义参考样式</option><option value="analysis">分析样式</option></select></label><label>log 轴刻度标签<select id="log-labels"><option value="logvalue" selected>log10 数值（0、1、2…）</option><option value="raw">原始浓度（1、10、100…）</option></select></label><label>散点与误差棒<select id="point-display"><option value="summary" selected>均值 ± SD</option><option value="raw">原始观测</option></select></label></div>
+          <details class="reference-panel" id="reference-panel"><summary>参考样式 <span>上传参考图或设置图形格式</span></summary><div class="reference-body">
+            <div class="reference-upload"><label class="upload-button">上传参考图或样式文件<input id="reference-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.json" class="sr-only"></label><button type="button" class="text-btn" id="reference-reset">恢复默认</button></div>
+            <p class="micro">PNG / JPG / WebP 自动提取彩色主色；截图的字体、符号和布局不能自动完整识别，请在下方调整。可重新导入本工具的 SVG / 样式 JSON，恢复颜色、符号、字体、线宽和标题。文件仅在当前浏览器内读取。</p>
+            <div class="reference-preview" id="reference-preview" hidden><img id="reference-image" alt="上传的 Prism 样式参考图"><span id="reference-filename"></span></div>
+            <label class="reference-prompt-label" for="reference-prompt">或输入样式描述</label><div class="reference-prompt-row"><input id="reference-prompt" type="text" maxlength="500" placeholder="例如：蓝色曲线，空心圆，Arial，线宽 2，字号 24"><button type="button" id="reference-parse">应用描述</button></div>
+            <div class="reference-options"><label>曲线与符号主色<input id="ref-color" type="color" value="#ff9b3d"></label><label>散点形状<select id="ref-shape"><option value="square">方块</option><option value="circle">圆形</option><option value="triangle">三角形</option></select></label><label>符号填充<select id="ref-fill"><option value="hollow">空心</option><option value="solid">实心</option></select></label><label>字体<select id="ref-font"><option>Arial</option><option>Times New Roman</option><option>Helvetica</option></select></label><label>曲线线宽<input id="ref-stroke" type="number" min="1" max="6" step="0.5" value="3.5"></label><label>坐标轴线宽<input id="ref-axis" type="number" min="1" max="6" step="0.5" value="4"></label><label>字号<input id="ref-size" type="number" min="16" max="34" step="1" value="27"></label><label>符号大小<input id="ref-marker" type="number" min="5" max="20" step="1" value="11"></label></div>
+            <div class="reference-titles"><label>横轴标题（空白 = 自动）<input id="ref-x-title" type="text" maxlength="100" placeholder="随线性 / log 设置自动生成"></label><label>纵轴标题<input id="ref-y-title" type="text" maxlength="100" value="Cell Viability (%)"></label></div>
+            <div class="reference-actions"><button type="button" id="reference-apply">使用此参考样式</button><button type="button" id="reference-save">保存样式 JSON</button><span id="reference-status" role="status">更改样式不会重新拟合或改动原始数据。</span></div>
+          </div></details>
+          <div id="chart" class="chart"></div>
+          <p class="micro figure-help" id="figure-help">Prism 参考样式：橙色空心方块、黑色坐标轴、可编辑 IC50 标注。误差棒仅由实际复孔计算。</p>
+          <div id="zero-note" class="zero-note" hidden></div>
+          <div class="chart-bottom"><div class="legend" id="chart-legend"><span>□ 输入观测或复孔均值</span><span>— 拟合曲线</span><span>误差棒 = SD</span></div><label class="check-label"><input type="checkbox" id="show-residual">显示残差</label></div>
+          <div id="residual-wrap" hidden><div class="residual-heading">残差 = 实测 − 预测 <span>检查是否随机分布在 0 两侧</span></div><div id="residual-chart"></div></div>
+        </section>
+        <section class="parameter-section"><div class="parameter-head"><h2>拟合结果</h2><span id="fit-status" aria-live="polite">参数尚未计算</span></div>
+          <table class="result-table"><thead><tr><th scope="col">参数</th><th scope="col">估计值</th><th scope="col">说明</th></tr></thead><tbody>
+            <tr class="ic50-row"><th scope="row">IC50</th><td class="param-value" id="ic50">—</td><td id="ic50-desc">Top 与 Bottom 中点对应的浓度</td></tr>
+            <tr><th scope="row">Top</th><td class="param-value" id="top">—</td><td id="top-desc">上平台</td></tr>
+            <tr><th scope="row">Bottom</th><td class="param-value" id="bottom">—</td><td id="bottom-desc">下平台</td></tr>
+            <tr><th scope="row">HillSlope</th><td class="param-value" id="hill">—</td><td id="hill-desc">下降曲线为负；绝对值越大越陡</td></tr>
+          </tbody></table>
+          <div class="fit-meta" id="fit-meta"><span>R² <b>—</b></span><span>RMSE <b>—</b></span><span>观测数 <b>—</b></span><span>残差自由度 <b>—</b></span></div>
+          <div class="interpretation" id="interpretation"><p>IC50 是曲线自身的半最大响应点。只有 Top=100、Bottom=0 时，它才对应存活率 50%。</p></div>
+          <div id="diagnostics" class="diagnostics" aria-live="polite"></div>
+          <div class="export-row"><div class="export-options"><label>图形格式<select id="export-format"><option value="svg">SVG（矢量，可编辑）</option><option value="png">PNG（无损图片）</option><option value="jpeg">JPG（压缩图片）</option><option value="tiff">TIFF（无损图片）</option><option value="pdf">PDF（高清图版）</option></select></label><label>分辨率<select id="export-dpi" disabled><option value="150">150 dpi</option><option value="300" selected>300 dpi</option><option value="600">600 dpi</option></select></label><label>图宽<select id="export-width" disabled><option value="90">90 mm</option><option value="180" selected>180 mm</option></select></label></div><div class="export-buttons"><button id="export-results" type="button" disabled>导出结果 CSV</button><button id="export-svg" type="button" disabled>导出图形</button></div><p id="export-help" class="micro export-help">SVG 中的文字、坐标轴、散点和曲线可分别编辑。</p></div>
+        </section>
+      </div>
+    </div>
+    <details class="guide" id="guide"><summary>使用说明：横轴、模型和 0 浓度</summary><div class="guide-grid">
+      <article><h3>横轴与输入值</h3><p>这里始终输入原始浓度。若在 Prism 输入的 X 已是 log10(浓度)，应选择 <b>log(inhibitor) vs. response</b>；X 仍是原始浓度时，选择 <b>[Inhibitor] vs. response</b>，再把图轴设为 log。</p><div class="guide-foot">等差浓度取 log 后通常不等距；等比浓度才等距。</div></article>
+      <article><h3>模型选择</h3><p>平台和中间过渡区覆盖充分时，可拟合完整 4PL。中间浓度少时，比较固定斜率模型需要科学依据。只有可靠对照界定了 0% 与 100%，才考虑固定平台。不要单凭更高的 R² 选模型。</p><div class="guide-foot">本工具仅支持对称、单相下降；上升、双相与钟形响应需其他模型。</div></article>
+      <article><h3>0 浓度处理</h3><p>log10(0) 没有有限值。这里用下降模型在 0 浓度的极限 <b>Y(0)=Top</b> 纳入拟合。log 图仅绘制正浓度，并在图旁列出 0 浓度观测；线性轴可直接显示它。</p><div class="guide-foot">不把 0 改成 1 或极小数，也不补造缺失实验点。</div></article>
+    </div></details>
+    <details class="method-details"><summary>公式、计算范围与 Prism 对应设置 </summary><div class="method-body"><div class="equation">Y = Bottom + (Top − Bottom) / [1 + (C / IC50)<sup>−HillSlope</sup>]</div><p>C 为原始浓度；C=0 时使用 Y=Top；IC50&gt;0，HillSlope&lt;0，Top&gt;Bottom。正浓度上等价于 Prism 的下降型可变斜率公式。通过确定性多起点优化拟合 log(IC50) 和斜率幅度；自由平台在每步用线性最小二乘解出。数值搜索范围：IC50 为输入正浓度范围外扩 6 个数量级，|HillSlope| 约 0.001–50；命中边界会提示。</p><p>每个输入复孔等权。RMSE = √(SSE/n)，单位为百分点；R² = 1−SSE/SST，仅描述拟合，不验证模型。图线是预测值，散点是输入值。此版本不计算置信区间，不包含加权、离群值自动剔除或全局拟合；关键研究结论应在 Prism 中用匹配设置复核。与 Prism 的优化细节、约束或置信区间设置不同，结果可能存在差异。</p><div class="source-links"><a href="https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_dr_inhibit_variable_2.htm" target="_blank" rel="noopener noreferrer">GraphPad：4PL 公式</a><a href="https://www.graphpad.com/guides/prism/latest/curve-fitting/reg_choosing_a_dr_equation.htm" target="_blank" rel="noopener noreferrer">GraphPad：模型选择</a></div></div></details>
+    <footer><span>IC50 曲线拟合</span><span>输入数据不上传服务器</span></footer>
+  </main><div id="toast" class="toast" role="status" hidden></div>
+</body></html>
